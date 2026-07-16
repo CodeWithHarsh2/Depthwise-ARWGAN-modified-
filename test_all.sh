@@ -2,9 +2,9 @@
 
 set -e
 
-CHECKPOINT="/kaggle/input/datasets/harshaggarwal925/epoch-100/epoch_100.pth"
+CHECKPOINT="/kaggle/working/Depthwise-ARWGAN-modified-/runs/DEPTHWISE_ARWGAN 2026.07.16--15-00-21/checkpoints/epoch_100.pth"
 
-OPTIONS="/kaggle/working/Depthwise-ARWGAN/runs/DEPTHWISE_ARWGAN 2026.07.15--07-29-56/options-and-config.pickle"
+OPTIONS="/kaggle/working/Depthwise-ARWGAN-modified-/runs/DEPTHWISE_ARWGAN 2026.07.16--15-00-21/options-and-config.pickle"
 
 DATASET="/kaggle/input/datasets/ifigotin/imagenetmini-1000/imagenet-mini/val"
 
