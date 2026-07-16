@@ -1,0 +1,11 @@
+torch
+torchvision
+numpy
+opencv-python
+Pillow
+scipy
+scikit-image
+tensorboardX
+tqdm
+matplotlib
+kornia==0.5.11
