@@ -1,8 +1,16 @@
+import os
+
+# Select the physical GPU before importing PyTorch.
+# If you launch with:
+#   CUDA_VISIBLE_DEVICES=1 python test.py ...
+# this line is unnecessary and can be removed.
+
+import torch
 import torch.nn
 import argparse
-import os
 import math
 import utils
+import numpy as np
 from model.ARWGAN import *
 from noise_argparser import NoiseArgParser
 from noise_layers.noiser import Noiser
@@ -11,8 +19,6 @@ import torchvision.transforms.functional as TF
 import pandas as pd
 import random
 
-
-os.makedirs("results", exist_ok=True)
 
 
 def randomCrop(img, height, width):
@@ -40,7 +46,6 @@ def yuv_psnr(img):
 
 
 def main():
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
     random.seed(42)
     np.random.seed(42)
@@ -48,10 +53,29 @@ def main():
 
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(42)
-    if torch.cuda.is_available():
-        device = torch.device('cuda')
+        device = torch.device("cuda:0")
     else:
-        device = torch.device('cpu')
+        device = torch.device("cpu")
+
+    print("=" * 60)
+    print("Device Information")
+    print("=" * 60)
+    print(f"PyTorch Version : {torch.__version__}")
+    print(f"CUDA Available  : {torch.cuda.is_available()}")
+
+    if torch.cuda.is_available():
+        print(f"CUDA Version    : {torch.version.cuda}")
+        print(f"Visible GPUs    : {torch.cuda.device_count()}")
+        print(f"Current GPU     : {torch.cuda.current_device()}")
+        print(f"GPU Name        : {torch.cuda.get_device_name(0)}")
+
+        props = torch.cuda.get_device_properties(0)
+        print(f"GPU Memory      : {props.total_memory / (1024**3):.2f} GB")
+    else:
+        print("Running on CPU.")
+
+    print("=" * 60)
+
 
     parser = argparse.ArgumentParser(description='Test trained models')
     parser.add_argument('--options-file', '-o', default='options-and-config.pickle', type=str,
@@ -63,22 +87,38 @@ def main():
     parser.add_argument("--noise", '-n', nargs="*", action=NoiseArgParser)
     # parser.add_argument('--times', '-t', default=10, type=int,
     #                     help='Number iterations (insert watermark->extract).')
+    parser.add_argument(
+    "--output-dir",
+    default="results",
+    type=str,
+    help="Directory to save evaluation results."
+)
 
     args = parser.parse_args()
+    output_dir = args.output_dir
+    os.makedirs(output_dir, exist_ok=True)
+
     train_options, net_config, noise_config = utils.load_options(args.options_file)
     noise_config = args.noise
     noiser = Noiser(noise_config, device)
+    checkpoint = torch.load(
+    args.checkpoint_file,
+    map_location=device,
+    weights_only=False
+    )
 
-    checkpoint = torch.load(args.checkpoint_file,map_location=device)
     hidden_net = ARWGAN(net_config, device, noiser, None)
     utils.model_from_checkpoint(hidden_net, checkpoint)
+    
     source_images = []
 
-    for root, dirs, files in os.walk(args.source_images):
+    
+    for root, _, files in os.walk(args.source_images):
         for f in files:
             if f.lower().endswith((".jpg",".jpeg",".png",".bmp")):
                 source_images.append(os.path.join(root,f))
 
+    source_images.sort()
     print(f"Found {len(source_images)} images.")
 
     results=[]
@@ -93,15 +133,19 @@ def main():
         message = torch.Tensor(np.random.choice([0, 1], (image_tensor.shape[0],
                                                          net_config.message_length))).to(device)
 
-        losses, (encoded_images, noised_images, decoded_messages) = hidden_net.validate_on_batch(
-            [image_tensor, message])
+        with torch.inference_mode():
+            losses, (encoded_images, noised_images, decoded_messages) = \
+                hidden_net.validate_on_batch([image_tensor, message])
+        
+        
 
         decoded_rounded = decoded_messages.detach().cpu().numpy().round().clip(0, 1)
         message_detached = message.detach().cpu().numpy()
         ber=np.mean(np.abs(decoded_rounded-message_detached))
         accuracy=1-ber
 
-        if len(results) % 100 == 0:
+        
+        if (len(results) + 1) % 100 == 0:
             print(f"Processed {len(results)} images...")
 
         results.append({
@@ -113,13 +157,17 @@ def main():
         })
 
     try:
+
         utils.save_images(
             image_tensor.cpu(),
             encoded_images.cpu(),
             "test",
-            "results",
+            output_dir,
             resize_to=(128,128)
         )
+
+
+
     except Exception as e:
         print("save_images skipped:",e)
 
@@ -140,21 +188,26 @@ def main():
     avg = df.mean(numeric_only=True)
     print(avg)
 
+
     df.to_csv(
-        "results/evaluation_results.csv",
-        index=False
+    os.path.join(output_dir, "evaluation_results.csv"),
+    index=False
     )
+
 
     avg.to_frame().T.to_csv(
-        "results/average_metrics.csv",
-        index=False
+    os.path.join(output_dir, "average_metrics.csv"),
+    index=False
     )
 
+
     print("\nSaved:")
-    print("results/evaluation_results.csv")
-    print("results/average_metrics.csv")
+    print(os.path.join(output_dir, "evaluation_results.csv"))
+    print(os.path.join(output_dir, "average_metrics.csv"))
+    print(os.path.join(output_dir, "epoch-test.png"))
 
 
 
 if __name__ == '__main__':
     main()
+
