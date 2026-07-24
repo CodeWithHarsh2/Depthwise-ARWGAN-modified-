@@ -2,9 +2,9 @@
 
 set -e
 
-CHECKPOINT="/kaggle/input/datasets/harshtayal26/checkpoints/checkpoints/epoch_100.pth"
+CHECKPOINT="/kaggle/input/datasets/harshaggarwal925/checkpoint/checkpoints/epoch_100.pth"
 
-OPTIONS="/kaggle/input/datasets/harshtayal26/checkpoints/options-and-config.pickle"
+OPTIONS="/kaggle/input/datasets/harshaggarwal925/checkpoint/options-and-config.pickle"
 
 DATASET="/kaggle/input/datasets/ifigotin/imagenetmini-1000/imagenet-mini/val"
 
